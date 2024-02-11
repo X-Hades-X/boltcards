@@ -96,7 +96,7 @@ async def api_scan(p, c, request: Request, external_id: str):
     }
 
     if card.pin_enable:
-        setattr(payload, "pinLimit", card.pin_limit)
+        payload["pinLimit"] = card.pin_limit
 
     return payload
 
