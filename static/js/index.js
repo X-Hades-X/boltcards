@@ -63,6 +63,18 @@ new Vue({
             align: 'left',
             label: 'Daily tx limit',
             field: 'daily_limit'
+          },
+          {
+            name: 'pin_enabled',
+            align: 'left',
+            label: 'Pin enabled',
+            field: 'pin_enabled'
+          },
+          {
+            name: 'pin_limit',
+            align: 'left',
+            label: 'Min tx requesting pin',
+            field: 'pin_limit'
           }
         ],
         pagination: {

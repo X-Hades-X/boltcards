@@ -8,6 +8,7 @@ from lnurl.types import LnurlPayMetadata
 from pydantic import BaseModel
 
 ZERO_KEY = "00000000000000000000000000000000"
+ZERO_PIN = "0000"
 
 
 class Card(BaseModel):
@@ -20,6 +21,10 @@ class Card(BaseModel):
     tx_limit: int
     daily_limit: int
     enable: bool
+    pin_enable: bool
+    pin_number: str
+    pin_limit: int
+    pin_try: int
     k0: str
     k1: str
     k2: str
@@ -48,6 +53,10 @@ class CreateCardData(BaseModel):
     tx_limit: int = Query(0)
     daily_limit: int = Query(0)
     enable: bool = Query(True)
+    pin_enable: bool = Query(False)
+    pin_number: str = Query(ZERO_PIN)
+    pin_limit: int = Query(0)
+    pin_try: int = Query(0)
     k0: str = Query(ZERO_KEY)
     k1: str = Query(ZERO_KEY)
     k2: str = Query(ZERO_KEY)

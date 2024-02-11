@@ -292,6 +292,39 @@
           </div>
         </div>
 
+        
+        <q-toggle
+          v-model="cardDialog.data.pin_enable"
+          label="Show advanced options"
+        ></q-toggle>
+        <div v-show="cardDialog.data.pin_enable" class="q-gutter-y-md">
+          <div class="row">
+            <div class="col">
+              <q-input
+                filled
+                dense
+                emit-value
+                v-model.trim="cardDialog.data.pin_limit"
+                type="number"
+                label="Min transaction (sats)"
+                class="q-pr-sm"
+              ></q-input>
+            </div>
+            <div class="col">
+              <q-input
+                filled
+                dense
+                emit-value
+                v-model.trim="cardDialog.data.pin_number"
+                v-model.number="pin"
+                inputmode="numeric"
+                mask="####"
+                label="Pin"
+              ></q-input>
+            </div>
+          </div>
+        </div>
+
         <q-toggle
           v-model="toggleAdvanced"
           label="Show advanced options"

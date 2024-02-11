@@ -24,6 +24,10 @@ async def create_card(data: CreateCardData, wallet_id: str) -> Card:
             tx_limit,
             daily_limit,
             enable,
+            pin_enable,
+            pin_number,
+            pin_limit,
+            pin_try,
             k0,
             k1,
             k2,
@@ -41,6 +45,10 @@ async def create_card(data: CreateCardData, wallet_id: str) -> Card:
             data.tx_limit,
             data.daily_limit,
             True,
+            data.pin_enable,
+            data.pin_number,
+            data.pin_limit,
+            0,
             data.k0,
             data.k1,
             data.k2,
@@ -140,6 +148,13 @@ async def delete_card(card_id: str) -> None:
 async def update_card_counter(counter: int, id: str):
     await db.execute(
         "UPDATE boltcards.cards SET counter = ? WHERE id = ?",
+        (counter, id),
+    )
+
+
+async def update_pin_try_counter(counter: int, id: str):
+    await db.execute(
+        "UPDATE boltcards.cards SET pin_try = ? WHERE id = ?",
         (counter, id),
     )
 

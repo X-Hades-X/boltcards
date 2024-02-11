@@ -11,6 +11,7 @@ from .crud import (
     create_card,
     delete_card,
     enable_disable_card,
+    update_pin_try_counter,
     get_card,
     get_card_by_uid,
     get_cards,
@@ -88,6 +89,10 @@ async def api_card_update(
             detail="UID already registered. Delete registered card and try again.",
             status_code=HTTPStatus.BAD_REQUEST,
         )
+    
+    if card.pin_enable:
+        card = await update_pin_try_counter(0, id=card_id)
+
     card = await update_card(card_id, **data.dict())
     assert card, "update_card should always return a card"
     return card
@@ -125,6 +130,10 @@ async def enable_card(
     if card.wallet != wallet.wallet.id:
         raise HTTPException(detail="Not your card.", status_code=HTTPStatus.FORBIDDEN)
     card = await enable_disable_card(enable=enable, id=card_id)
+
+    if card.pin_enable and enable:
+        card = await update_pin_try_counter(0, id=card_id)
+
     assert card
     return card.dict()
 

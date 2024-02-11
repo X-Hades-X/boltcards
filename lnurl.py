@@ -23,6 +23,8 @@ from .crud import (
     spend_hit,
     update_card_counter,
     update_card_otp,
+    update_pin_try_counter,
+    enable_disable_card,
 )
 from .nxp424 import decryptSUN, getSunMAC
 
@@ -83,7 +85,7 @@ async def api_scan(p, c, request: Request, external_id: str):
     # create a lud17 lnurlp to support lud19, add to payLink field of the withdrawRequest
     lnurlpay_nonbech32_lud17 = lnurlpay_raw.replace("https://", "lnurlp://").replace("http://","lnurlp://")
 
-    return {
+    payload = {
         "tag": "withdrawRequest",
         "callback": str(request.url_for("boltcards.lnurl_callback", hit_id=hit.id)),
         "k1": hit.id,
@@ -92,6 +94,11 @@ async def api_scan(p, c, request: Request, external_id: str):
         "defaultDescription": f"Boltcard (refund address lnurl://{lnurlpay_bech32})",
         "payLink": lnurlpay_nonbech32_lud17,  # LUD-19 compatibility
     }
+
+    if card.pin_enable:
+        setattr(payload, "pinLimit", card.pin_limit)
+
+    return payload
 
 
 @boltcards_ext.get(
@@ -103,6 +110,7 @@ async def lnurl_callback(
     hit_id: str,
     k1: str = Query(None),
     pr: str = Query(None),
+    pin: str = Query(None),
 ):
     if not k1:
         return {"status": "ERROR", "reason": "Missing K1 token"}
@@ -126,6 +134,15 @@ async def lnurl_callback(
 
     card = await get_card(hit.card_id)
     assert card
+    
+    if card.pin_enable:
+        if card.pin_number is not pin:
+            card = await update_pin_try_counter(card.pin_try+1, id=card.id)
+            if card.pin_try >= 3:    
+                card = await enable_disable_card(False, id=card.id)
+                return {"status": "ERROR", "reason": f"Entered wrong pin too many times. Card is disabled."}
+            return {"status": "ERROR", "reason": f"Wrong pin. This was try number {card.pin_try}."}
+
     hit = await spend_hit(id=hit.id, amount=int(invoice.amount_msat / 1000))
     assert hit
     try:
