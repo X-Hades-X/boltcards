@@ -295,7 +295,7 @@
         
         <q-toggle
           v-model="cardDialog.data.pin_enable"
-          label="Show advanced options"
+          label="Enable pin"
         ></q-toggle>
         <div v-show="cardDialog.data.pin_enable" class="q-gutter-y-md">
           <div class="row">
@@ -316,7 +316,7 @@
                 dense
                 emit-value
                 v-model.trim="cardDialog.data.pin_number"
-                v-model.number="pin"
+                type="password"
                 inputmode="numeric"
                 mask="####"
                 label="Pin"

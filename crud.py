@@ -33,7 +33,7 @@ async def create_card(data: CreateCardData, wallet_id: str) -> Card:
             k2,
             otp
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             card_id,
