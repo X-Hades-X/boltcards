@@ -136,10 +136,12 @@ async def lnurl_callback(
     assert card
     
     if card.pin_enable:
-        if card.pin_number is not pin:
+        if card.pin_number == pin:
             card = await update_pin_try_counter(card.pin_try+1, id=card.id)
+            assert card
             if card.pin_try >= 3:    
                 card = await enable_disable_card(False, id=card.id)
+                assert card
                 return {"status": "ERROR", "reason": f"Entered wrong pin too many times. Card is disabled."}
             return {"status": "ERROR", "reason": f"Wrong pin. This was try number {card.pin_try}."}
 

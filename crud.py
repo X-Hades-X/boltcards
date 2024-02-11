@@ -152,11 +152,12 @@ async def update_card_counter(counter: int, id: str):
     )
 
 
-async def update_pin_try_counter(counter: int, id: str):
+async def update_pin_try_counter(counter: int, id: str) -> Optional[Card]:
     await db.execute(
         "UPDATE boltcards.cards SET pin_try = ? WHERE id = ?",
         (counter, id),
     )
+    return await get_card(id)
 
 
 async def enable_disable_card(enable: bool, id: str) -> Optional[Card]:
