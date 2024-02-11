@@ -136,7 +136,7 @@ async def lnurl_callback(
     assert card
     
     if card.pin_enable:
-        if card.pin_number == pin:
+        if card.pin_number != pin:
             card = await update_pin_try_counter(card.pin_try+1, id=card.id)
             assert card
             if card.pin_try >= 3:    

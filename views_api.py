@@ -130,11 +130,12 @@ async def enable_card(
     if card.wallet != wallet.wallet.id:
         raise HTTPException(detail="Not your card.", status_code=HTTPStatus.FORBIDDEN)
     card = await enable_disable_card(enable=enable, id=card_id)
+    assert card
 
     if card.pin_enable and enable:
         card = await update_pin_try_counter(0, id=card_id)
+        assert card
 
-    assert card
     return card.dict()
 
 
