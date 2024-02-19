@@ -135,7 +135,7 @@ async def lnurl_callback(
     card = await get_card(hit.card_id)
     assert card
     
-    if card.pin_enable and card.pin_limit < hit.amount:
+    if card.pin_enable and (invoice.amount_msat / 1000) >= card.pin_limit:
         if card.pin_number != pin:
             card = await update_pin_try_counter(card.pin_try+1, id=card.id)
             assert card
