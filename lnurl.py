@@ -135,7 +135,8 @@ async def lnurl_callback(
     card = await get_card(hit.card_id)
     assert card
     
-    if card.pin_enable and (invoice.amount_msat / 1000) >= card.pin_limit:
+    amount = int(invoice.amount_msat / 1000)
+    if card.pin_enable and amount >= card.pin_limit:
         if card.pin_number != pin:
             card = await update_pin_try_counter(card.pin_try+1, id=card.id)
             assert card
@@ -145,7 +146,7 @@ async def lnurl_callback(
                 return {"status": "ERROR", "reason": f"Entered wrong pin too many times. Card is disabled."}
             return {"status": "ERROR", "reason": f"Wrong pin. This was try number {card.pin_try}."}
 
-    hit = await spend_hit(id=hit.id, amount=int(invoice.amount_msat / 1000))
+    hit = await spend_hit(id=hit.id, amount=amount)
     assert hit
     try:
         await pay_invoice(
