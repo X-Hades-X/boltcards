@@ -97,7 +97,7 @@ async def api_scan(p, c, request: Request, external_id: str):
         "callback": str(request.url_for("boltcards.lnurl_callback", hit_id=hit.id)),
         "k1": hit.id,
         "minWithdrawable": 1 * 1000,
-        "maxWithdrawable": min(card.tx_limit, card.daily_limit - hits_amount, wallet.balance_msat) * 1000,
+        "maxWithdrawable": min(card.tx_limit, card.daily_limit - hits_amount, wallet.balance_msat / 1000) * 1000,
         "defaultDescription": card.card_name,
         "payLink": lnurlpay_nonbech32_lud17,  # LUD-19 compatibility
     }
