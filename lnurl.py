@@ -11,6 +11,7 @@ from starlette.responses import HTMLResponse
 from lnbits import bolt11
 from lnbits.core.services import create_invoice
 from lnbits.core.views.api import pay_invoice
+from lnbits.core.crud import get_wallet
 
 from . import boltcards_ext
 from .crud import (
@@ -60,6 +61,12 @@ async def api_scan(p, c, request: Request, external_id: str):
 
     await update_card_counter(ctr_int, card.id)
 
+    try:
+        wallet = await get_wallet(wallet_id=card.wallet)
+        assert wallet
+    except Exception as exc:
+        return {"status": "ERROR", "reason": f"Loading wallet balance failed - {exc}"}
+
     # gathering some info for hit record
     assert request.client
     ip = request.client.host
@@ -90,8 +97,8 @@ async def api_scan(p, c, request: Request, external_id: str):
         "callback": str(request.url_for("boltcards.lnurl_callback", hit_id=hit.id)),
         "k1": hit.id,
         "minWithdrawable": 1 * 1000,
-        "maxWithdrawable": card.tx_limit * 1000,
-        "defaultDescription": f"Boltcard (refund address lnurl://{lnurlpay_bech32})",
+        "maxWithdrawable": min(card.tx_limit, card.daily_limit - hits_amount, wallet.wallet.balance_msat) * 1000,
+        "defaultDescription": card.card_name,
         "payLink": lnurlpay_nonbech32_lud17,  # LUD-19 compatibility
     }
 
@@ -137,6 +144,8 @@ async def lnurl_callback(
     
     amount = int(invoice.amount_msat / 1000)
     if card.pin_enable and amount >= card.pin_limit:
+        if not pin:
+           return {"status": "ERROR", "reason": "Need pin to withdraw."}
         if card.pin_number != pin:
             card = await update_pin_try_counter(card.pin_try+1, id=card.id)
             assert card
