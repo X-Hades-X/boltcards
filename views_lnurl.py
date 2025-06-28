@@ -22,6 +22,8 @@ from .crud import (
     spend_hit,
     update_card_counter,
     update_card_otp,
+    update_card_pin_try,
+    enable_disable_card,
 )
 from .models import UIDPost
 from .nxp424 import decrypt_sun, get_sun_mac
@@ -93,6 +95,7 @@ async def api_scan(p, c, request: Request, external_id: str):
         "maxWithdrawable": int(card.tx_limit) * 1000,
         "defaultDescription": f"Boltcard (refund address lnurl://{lnurlpay_bech32})",
         "payLink": lnurlpay_nonbech32_lud17,  # LUD-19 compatibility
+        "pinLimit":  None if not card.pin_enable else card.pin_limit, # LUD-21 compatibility
     }
 
 
@@ -105,6 +108,7 @@ async def lnurl_callback(
     hit_id: str,
     k1: str = Query(None),
     pr: str = Query(None),
+    pin: str = Query(None),
 ):
     # TODO: why no hit_id? its not used why is it passed by url?
     logger.debug(f"TODO: why no hit_id? {hit_id}")
@@ -131,6 +135,16 @@ async def lnurl_callback(
     card = await get_card(hit.card_id)
     assert card
     assert invoice.amount_msat, "Invoice amount is missing"
+
+    if card.pin_enable and card.pin_limit <= int(invoice.amount_msat / 1000) :
+        if card.pin != pin:
+            await update_card_pin_try(pin_try=card.pin_try + 1, card_id=card.id)
+            tries_left = 3 - card.pin_try
+            if tries_left == 0:
+                await enable_disable_card(enable=True, card_id=card.id)
+            return {"status": "ERROR", "reason": f"Wrong Pin. {tries_left} tries left."}
+
+
     hit = await spend_hit(card_id=hit.id, amount=int(invoice.amount_msat / 1000))
     assert hit
     try:
