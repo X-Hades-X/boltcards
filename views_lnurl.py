@@ -24,6 +24,7 @@ from .crud import (
     update_card_otp,
     update_card_pin_try,
     enable_disable_card,
+    update_hit_amount,
 )
 from .models import UIDPost
 from .nxp424 import decrypt_sun, get_sun_mac
@@ -100,15 +101,59 @@ async def api_scan(p, c, request: Request, external_id: str):
 
 
 @boltcards_lnurl_router.get(
+    "/api/v1/lnurl/{hit_id}",
+    status_code=HTTPStatus.OK,
+    name="boltcards.lnurl_withdraw",
+)
+async def lnurl_withdraw(
+    request: Request,
+    hit_id: str
+):
+    hit = await get_hit(hit_id)
+    if hit.amount and not hit.spent:
+        return {
+            "tag": "withdrawRequest",
+            "callback": str(request.url_for("boltcards.lnurl_callback", hit_id=hit.id)),
+            "k1": hit.id,
+            "minWithdrawable": hit.amount * 1000,
+            "maxWithdrawable": hit.amount * 1000,
+            "defaultDescription": f"{hit.amount} SATS",
+        }
+    else:
+        card = await get_card(hit.card_id)
+        # the raw lnurl
+        lnurlpay_raw = str(request.url_for("boltcards.lnurlp_response", hit_id=hit.id))
+        # bech32 encoded lnurl
+        lnurlpay_bech32 = lnurl_encode(lnurlpay_raw)
+        # create a lud17 lnurlp to support lud19, add payLink field of the withdrawRequest
+        lnurlpay_nonbech32_lud17 = lnurlpay_raw.replace("https://", "lnurlp://").replace(
+            "http://", "lnurlp://"
+        )
+
+        return {
+            "tag": "withdrawRequest",
+            "callback": str(request.url_for("boltcards.lnurl_callback", hit_id=hit.id)),
+            "k1": hit.id,
+            "minWithdrawable": 1 * 1000,
+            "maxWithdrawable": int(card.tx_limit) * 1000,
+            "defaultDescription": f"Boltcard (refund address lnurl://{lnurlpay_bech32})",
+            "payLink": lnurlpay_nonbech32_lud17,  # LUD-19 compatibility
+            "pinLimit":  None if not card.pin_enable else int(card.pin_limit) * 1000, # LUD-21 compatibility
+        }
+
+
+@boltcards_lnurl_router.get(
     "/api/v1/lnurl/cb/{hit_id}",
     status_code=HTTPStatus.OK,
     name="boltcards.lnurl_callback",
 )
 async def lnurl_callback(
+    request: Request,
     hit_id: str,
     k1: str = Query(None),
     pr: str = Query(None),
     pin: str = Query(None),
+    amount: int = Query(None)
 ):
     # TODO: why no hit_id? its not used why is it passed by url?
     logger.debug(f"TODO: why no hit_id? {hit_id}")
@@ -124,19 +169,40 @@ async def lnurl_callback(
         }
     if hit.spent:
         return {"status": "ERROR", "reason": "Payment already claimed"}
-    if not pr:
-        return {"status": "ERROR", "reason": "Missing payment request"}
-
-    try:
-        invoice = bolt11.decode(pr)
-    except bolt11.Bolt11Exception:
-        return {"status": "ERROR", "reason": "Failed to decode payment request"}
+    if not pr or not amount:
+        return {"status": "ERROR", "reason": "Missing payment request or amount"}
 
     card = await get_card(hit.card_id)
     assert card
-    assert invoice.amount_msat, "Invoice amount is missing"
 
-    if card.pin_enable and int(card.pin_limit) * 1000 <= int(invoice.amount_msat) :
+    invoice = None
+    if pr:
+        try:
+            invoice = bolt11.decode(pr)
+        except bolt11.Bolt11Exception:
+            return {"status": "ERROR", "reason": "Failed to decode payment request"}
+        assert invoice.amount_msat, "Invoice amount is missing"
+
+    assert amount or invoice
+    pin_required = card.pin_enable
+    if amount:
+        if not hit.amount and amount > int(card.tx_limit):
+            return {"status": "ERROR", "reason": "Amount exceeds max amount"}
+        pin_required = pin_required and int(card.pin_limit) * 1000 <= int(amount)
+    elif invoice:
+        if int(invoice.amount_msat) > int(card.tx_limit) * 1000:
+            return {"status": "ERROR", "reason": "Amount exceeds max amount"}
+        if hit.amount:
+            if hit.amount * 1000 == int(invoice.amount_msat):
+                pin_required = False
+            else:
+                return {"status": "ERROR", "reason": "Presigned different amount"}
+        else:
+            pin_required = pin_required and int(card.pin_limit) * 1000 <= int(invoice.amount_msat)
+
+    if pin_required:
+        if amount and not hit.amount and not pin:
+            return {"status": "ERROR", "reason": "Need pin to presign amount"}
         if card.pin != pin:
             tries_left = 2 - card.pin_try
             if tries_left == 0:
@@ -148,19 +214,24 @@ async def lnurl_callback(
         else:
             await update_card_pin_try(pin_try=0, card_id=card.id)
 
-
-    hit = await spend_hit(card_id=hit.id, amount=int(invoice.amount_msat / 1000))
-    assert hit
-    try:
-        await pay_invoice(
-            wallet_id=card.wallet,
-            payment_request=pr,
-            max_sat=int(card.tx_limit),
-            extra={"tag": "boltcards", "hit": hit.id},
-        )
-        return {"status": "OK"}
-    except Exception as exc:
-        return {"status": "ERROR", "reason": f"Payment failed - {exc}"}
+    if amount:
+        await update_hit_amount(hit_id=hit.id, amount=int(amount / 1000))
+        # the raw lnurl
+        lnurlwithdraw_raw = str(request.url_for("boltcards.lnurl_withdraw", hit_id=hit.id))
+        return {"lnurl": lnurlwithdraw_raw}
+    else:
+        hit = await spend_hit(card_id=hit.id, amount=int(invoice.amount_msat / 1000))
+        assert hit
+        try:
+            await pay_invoice(
+                wallet_id=card.wallet,
+                payment_request=pr,
+                max_sat=int(card.tx_limit),
+                extra={"tag": "boltcards", "hit": hit.id},
+            )
+            return {"status": "OK"}
+        except Exception as exc:
+            return {"status": "ERROR", "reason": f"Payment failed - {exc}"}
 
 
 # /boltcards/api/v1/auth?a=00000000000000000000000000000000

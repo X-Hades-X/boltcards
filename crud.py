@@ -199,6 +199,14 @@ async def spend_hit(card_id: str, amount: int):
     return await get_hit(card_id)
 
 
+async def update_hit_amount(hit_id: str, amount: int):
+    await db.execute(
+        "UPDATE boltcards.hits SET amount = :amount WHERE id = :id",
+        {"amount": amount, "id": hit_id},
+    )
+    return await get_hit(hit_id)
+
+
 async def create_hit(card_id, ip, useragent, old_ctr, new_ctr) -> Hit:
     hit_id = urlsafe_short_hash()
     await db.execute(
