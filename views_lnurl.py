@@ -110,7 +110,16 @@ async def lnurl_withdraw(
     hit_id: str
 ):
     hit = await get_hit(hit_id)
-    if hit.amount and not hit.spent:
+
+    if not hit:
+        return {
+            "status": "ERROR",
+            "reason": "Record not found for this charge",
+        }
+    if hit.spent:
+        return {"status": "ERROR", "reason": "Payment already claimed"}
+
+    if hit.amount:
         return {
             "tag": "withdrawRequest",
             "callback": str(request.url_for("boltcards.lnurl_callback", hit_id=hit.id)),
