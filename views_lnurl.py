@@ -224,7 +224,7 @@ async def lnurl_callback(
             await update_card_pin_try(pin_try=0, card_id=card.id)
 
     if amount:
-        await update_hit_amount(hit_id=hit.id, amount=int(amount / 1000))
+        await update_hit_amount(hit_id=hit.id, amount=int(amount))
         # the raw lnurl
         lnurlwithdraw_raw = str(request.url_for("boltcards.lnurl_withdraw", hit_id=hit.id))
         return {"lnurl": lnurlwithdraw_raw}
