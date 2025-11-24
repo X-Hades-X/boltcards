@@ -178,7 +178,7 @@ async def lnurl_callback(
         }
     if hit.spent:
         return {"status": "ERROR", "reason": "Payment already claimed"}
-    if not pr or not amount:
+    if not pr and not amount:
         return {"status": "ERROR", "reason": "Missing payment request or amount"}
 
     card = await get_card(hit.card_id)
